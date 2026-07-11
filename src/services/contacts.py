@@ -24,7 +24,16 @@ def _handle_integrity_error(e: IntegrityError):
 
 
 class ContactService:
+    """
+    Service class wrapping the ContactRepository to handle contact-related business logic.
+    """
+
     def __init__(self, db: AsyncSession) -> None:
+        """
+        Initialize the contact service with a database session.
+
+        :param db: The asynchronous database session.
+        """
         self.repository = ContactRepository(db)
 
     async def get_contacts(
@@ -36,6 +45,17 @@ class ContactService:
         last_name: str | None,
         email: EmailStr | None,
     ):
+        """
+        Retrieve and filter contacts for a specific user.
+
+        :param skip: Number of contacts to skip.
+        :param limit: Maximum number of contacts to return.
+        :param user: The owner of the contacts.
+        :param first_name: Optional first name to filter by.
+        :param last_name: Optional last name to filter by.
+        :param email: Optional email address to filter by.
+        :return: A filtered list of Contact objects.
+        """
         contacts = await self.repository.get_contacts(skip, limit, user)
 
         if first_name:
@@ -56,6 +76,14 @@ class ContactService:
     async def get_contacts_birthday_next_7_days(
         self, skip: int, limit: int, user: User
     ):
+        """
+        Retrieve a list of contacts whose birthdays are within the next 7 days.
+
+        :param skip: Number of contacts to skip.
+        :param limit: Maximum number of contacts to return.
+        :param user: The owner of the contacts.
+        :return: A list of contacts celebrating birthdays within the next 7 days.
+        """
         contacts = await self.repository.get_contacts(skip, limit, user)
         contacts = [
             contact
@@ -66,9 +94,23 @@ class ContactService:
         return contacts
 
     async def get_contact(self, contact_id: int, user: User):
+        """
+        Retrieve a specific contact by its ID.
+
+        :param contact_id: The ID of the contact.
+        :param user: The owner of the contact.
+        :return: The Contact object if found, otherwise None.
+        """
         return await self.repository.get_contact_by_id(contact_id, user)
 
     async def create_contact(self, body: ContactModel, user: User):
+        """
+        Create a new contact. Handles integrity errors if the contact already exists.
+
+        :param body: The schema representing the new contact's details.
+        :param user: The owner of the new contact.
+        :return: The newly created Contact object.
+        """
         try:
             return await self.repository.create_contact(body, user)
         except IntegrityError as e:
@@ -76,6 +118,14 @@ class ContactService:
             _handle_integrity_error(e)
 
     async def update_contact(self, contact_id: int, body: ContactModel, user: User):
+        """
+        Update an existing contact. Handles database integrity errors.
+
+        :param contact_id: The ID of the contact to update.
+        :param body: The updated schema data.
+        :param user: The owner of the contact.
+        :return: The updated Contact object if found, otherwise None.
+        """
         try:
             return await self.repository.update_contact(contact_id, body, user)
         except IntegrityError as e:
@@ -83,4 +133,11 @@ class ContactService:
             _handle_integrity_error(e)
 
     async def remove_contact(self, contact_id: int, user: User):
+        """
+        Remove/Delete a contact.
+
+        :param contact_id: The ID of the contact to remove.
+        :param user: The owner of the contact.
+        :return: The removed Contact object if found, otherwise None.
+        """
         return await self.repository.remove_contact(contact_id, user)

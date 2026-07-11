@@ -28,6 +28,9 @@ class Config(BaseSettings):
     CLD_API_KEY: str = ""
     CLD_API_SECRET: str = ""
 
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+
     model_config = SettingsConfigDict(
         extra="ignore",
         env_file=BASE_DIR / ".env",

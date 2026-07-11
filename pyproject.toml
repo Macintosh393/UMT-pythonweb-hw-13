@@ -16,6 +16,22 @@ dependencies = [
     "pydantic-extra-types>=2.11.1",
     "pydantic-settings>=2.14.1",
     "python-jose[cryptography]>=3.5.0",
+    "redis>=8.0.1",
     "slowapi>=0.1.9",
+    "sphinx>=9.1.0",
     "sqlalchemy>=2.0.50",
 ]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = "."

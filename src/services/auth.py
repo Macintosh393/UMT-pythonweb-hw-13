@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, UTC
+import json
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -8,7 +9,8 @@ from jose import JWTError, jwt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.db import get_db
+from src.database.db import get_db, redis_client
+from src.database.models import User, Role
 from src.conf.config import config
 from src.services.users import UserService
 
@@ -61,10 +63,42 @@ async def get_current_user(
     except JWTError as e:
         raise credentials_exeption
 
+    cache_key = f"user:{username}"
+    try:
+        cached_user = await redis_client.get(cache_key)
+        if cached_user:
+            data = json.loads(cached_user)
+            user = User(
+                id=data["id"],
+                username=data["username"],
+                email=data["email"],
+                hashed_password=data["hashed_password"],
+                avatar_url=data["avatar_url"],
+                confirmed=data["confirmed"],
+                role=data.get("role", "user"),
+            )
+            return user
+    except Exception:
+        pass
+
     user_service = UserService(db)
     user = await user_service.get_user_by_username(username)
     if user is None:
         raise credentials_exeption
+
+    try:
+        user_data = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "hashed_password": user.hashed_password,
+            "avatar_url": user.avatar_url,
+            "confirmed": user.confirmed,
+            "role": user.role.value if hasattr(user, "role") and user.role else "user",
+        }
+        await redis_client.setex(cache_key, 3600, json.dumps(user_data))
+    except Exception:
+        pass
 
     return user
 
@@ -73,6 +107,16 @@ async def create_email_token(data: dict):
     to_encode = data.copy()
     now = datetime.now(UTC)
     expire = now + timedelta(days=7)
+    to_encode.update({"iat": now, "exp": expire})
+
+    token = jwt.encode(to_encode, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
+    return token
+
+
+async def create_reset_token(data: dict):
+    to_encode = data.copy()
+    now = datetime.now(UTC)
+    expire = now + timedelta(hours=1)
     to_encode.update({"iat": now, "exp": expire})
 
     token = jwt.encode(to_encode, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
@@ -91,3 +135,14 @@ async def get_email_from_token(token: str):
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Faulty token for email verification",
         )
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation forbidden: Admin role required",
+        )
+    return current_user

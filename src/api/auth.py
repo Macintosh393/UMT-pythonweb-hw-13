@@ -10,12 +10,12 @@ from fastapi import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordRequestForm
 
-from src.schemas.users import UserCreate, UserResponse
+from src.schemas.users import UserCreate, UserResponse, ResetPassword
 from src.schemas.tokens import TokenModel
 from src.schemas.email import RequestEmail
 from src.services.auth import create_access_token, Hash, get_email_from_token
 from src.services.users import UserService
-from src.services.email import send_email
+from src.services.email import send_email, send_reset_password_email
 from src.database.db import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -116,3 +116,44 @@ async def request_email(
         )
 
     return {"message": "Check your email for confirmation"}
+
+
+@router.post("/request-password-reset")
+async def request_password_reset(
+    body: RequestEmail,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user_service = UserService(db)
+    user = await user_service.get_user_by_email(body.email)
+    if user:
+        background_tasks.add_task(
+            send_reset_password_email,
+            user.email,
+            user.username,
+            str(request.base_url),
+        )
+    return {
+        "message": "If the email is registered, you will receive a reset password link."
+    }
+
+
+@router.post("/reset-password/{token}")
+async def reset_password(
+    token: str,
+    body: ResetPassword,
+    db: AsyncSession = Depends(get_db),
+):
+    email = await get_email_from_token(token)
+    user_service = UserService(db)
+    user = await user_service.get_user_by_email(str(email))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification error. No such user",
+        )
+
+    hashed_password = Hash().get_password_hash(body.new_password)
+    await user_service.update_password(user.email, hashed_password)
+    return {"message": "Your password has been successfully reset!"}

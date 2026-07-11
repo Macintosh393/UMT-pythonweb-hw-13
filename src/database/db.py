@@ -32,7 +32,16 @@ class DatabaseSessionManager:
             await session.close()
 
 
+import redis.asyncio as aioredis
+
 sessionmanager = DatabaseSessionManager(config.DB_URL)
+
+redis_client = aioredis.Redis(
+    host=config.REDIS_HOST,
+    port=config.REDIS_PORT,
+    db=0,
+    decode_responses=True
+)
 
 
 async def get_db():

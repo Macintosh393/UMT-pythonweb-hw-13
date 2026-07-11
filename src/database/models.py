@@ -1,12 +1,18 @@
 from datetime import date, datetime
 
-from sqlalchemy import Integer, String, Boolean, Date, DateTime, ForeignKey, func
+import enum
+from sqlalchemy import Integer, String, Boolean, Date, DateTime, ForeignKey, func, Enum as SqlEnum
 from sqlalchemy.orm import mapped_column, Mapped, DeclarativeBase, relationship
 from sqlalchemy.sql.schema import UniqueConstraint
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class Role(enum.Enum):
+    USER = "user"
+    ADMIN = "admin"
 
 
 class Contact(Base):
@@ -37,3 +43,4 @@ class User(Base):
         String(255), nullable=True, default=None
     )
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[Role] = mapped_column(SqlEnum(Role), default=Role.USER, nullable=False)
